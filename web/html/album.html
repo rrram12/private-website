@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>CHAT ROOM</title>
+		<link rel="stylesheet" href="../css/body.css">
+		<link rel="stylesheet" href="../css/nav.css">
+		<link rel="stylesheet" href="../css/album.css">
+	</head>
+	<body>
+		<nav>
+			<div class="navtitle"><strong>XINRAN HUANG</strong></div>
+			<a href="home.html">HOME</a>
+			<a href="about.html">INTRO</a>
+			<a href="blog.html">ABOUT</a>
+			<a href="album.html">TALK</a>
+			<a href="join.html">CONTACT</a>
+			<div class="navanim album"></div>
+			<div class="none"></div>
+		</nav>
+		<div id="talk">
+			<div class="all">
+				<div class='person'><text id="onLine">Online population</text></div>
+				<div class="contain">
+					<div class="content" id="content"></div>
+				</div>
+				<div class="footer">
+					<input placeholder="Set a name." name="userName" id="userName" />
+					<button id="setName" class="setting">SET</button>
+					<textarea placeholder="Enter the message." id="message" name="message"></textarea>
+					<button id="sendMessage" class="send">SENT</button>
+				</div>
+			</div>
+			
+			<div class="all2">
+				<div class="title"><text>Online Users:</text></div>
+				<div id="userList" class="userList">
+				</div>
+			</div>
+		</div>
+
+		<footer class="foot">
+			<p>@2023-2024 | BY:XINRAN HUANG</p>
+			<p>The copyright of the web page belongs to the individual.</p>
+			<p>WELCOME TO MY WORLD</p>
+		</footer>
+
+		<!-- <script src="../js/album.js"></script> -->
+		<script type="text/javascript" language="JavaScript">
+			//Difine global variables
+			let ws = null;
+
+			//Encapsulate a function that gets the time
+			Date.prototype.Format = function(fmt) {
+				//author: xjj
+				var o = {
+					"M+": this.getMonth() + 1, //Month
+					"d+": this.getDate(), //Day
+					"h+": this.getHours(), //Hour
+					"m+": this.getMinutes(), //Minute
+					"s+": this.getSeconds(), //Second
+					"q+": Math.floor((this.getMonth() + 3) / 3), //Quarter
+					"S": this.getMilliseconds() //Millisecond
+				};
+				if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+				for (var k in o)
+					if (new RegExp("(" + k + ")").test(fmt)) fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) :
+						(("00" + o[k]).substr(("" + o[k]).length)));
+				return fmt;
+			};
+
+			//Encapsulate the function that creates the Div and sends the message
+			const createChatDiv = (data) => {
+				let div = document.createElement('div');
+				let p_time = document.createElement('p');
+				let p_content = document.createElement('p');
+				switch (data.type) {
+					case 'serverInformation':
+						p_time.innerHTML = new Date().Format("yyyy-MM-dd hh:mm:ss");
+						p_content.innerHTML = data.message;
+						break;
+					case 'chat':
+						p_time.innerHTML = new Date().Format("yyyy-MM-dd hh:mm:ss");
+						p_content.innerHTML = data.name + ":" + data.message;
+						break;
+					default:
+						break;
+				}
+
+				p_time.setAttribute('class', 'time');
+				p_content.setAttribute('class', 'content');
+
+				div.appendChild(p_time);
+				div.appendChild(p_content);
+
+				return div;
+			};
+
+			//Encapsulate the function that sends the message
+			const send = () => {
+				let message = document.getElementById('message');
+
+				//Set that you cannnot send empty messages
+				if (!message.value) {
+					return
+				}
+				let data = {
+					type: 'chat',
+					message: message.value
+				};
+				ws.send(JSON.stringify(data));
+				message.value = ""
+			};
+
+			let setName = document.getElementById('setName');
+			setName.onclick = () => {
+				let userName = document.getElementById('userName');
+				let nickName = "I have no name.";
+				if (userName.value) {
+					nickName = userName.value;
+				}
+
+				//Establish a connection and send a connection into the the room (and the connection is kept for polling by the server)
+				ws = new WebSocket('wss://alfonsogilbert-chickenpowder-3000.codio-box.uk');
+				//ws = new WebSocket('ws://127.0.0.1:3000');
+
+				//When it connects...
+				ws.onopen = () => {
+					let data = {
+						type: 'setName',
+						nickname: nickName
+					};
+					ws.send(JSON.stringify(data))
+				};
+
+				//When sending messages...
+				document.getElementById('sendMessage').onclick = () => {
+					send();
+				};
+
+				//When accepting a request from a server...
+				ws.onmessage = (e) => {
+					let data = JSON.parse(e.data);
+					if(data.type!=='sending'){
+						console.log(data);
+					}
+
+					//When the received message is the number of people of connected...
+					if (data.type === 'chatterList') {
+						let list = data.list;
+						let length = list.length;
+						document.querySelector("#userList").innerHTML="";
+						let userList = document.getElementById('userList');
+						document.getElementById('onLine').innerText = `online population：${length}`;
+
+						for (let i = 0; i < list.length; i++) {
+							let p_user = document.createElement('p');
+							p_user.setAttribute('class', 'userList-item');
+							p_user.innerText = list[i].name;
+							userList.appendChild(p_user)
+						}
+					} else {
+
+						let oldContent = document.getElementById('content');
+						oldContent.appendChild(createChatDiv(data))
+						for(var i=0;i<document.querySelectorAll("#userList > p").length;i++){
+							let x=document.querySelectorAll("#userList > p")[i].innerText
+							x=x.replace("TYPING...","")
+							if(x===data.name){
+								document.querySelectorAll("#userList > p")[i].innerText=x
+							}
+						}
+					}
+
+					//The setting name cannot be changed.
+					setName.setAttribute('disabled', true);
+					let userName = document.getElementById('userName');
+					userName.setAttribute('disabled', true);
+					setName.style.display = "none";
+
+
+					var input=document.querySelector("#message")
+					input.addEventListener("click", function(e) {
+						var t = this.value;
+						// console.log(t)
+						let data = {
+							type: 'sending',
+							nickname:userName.value
+						};
+						ws.send(JSON.stringify(data));
+					})
+
+					// var send=document.querySelector("#sendMessage")
+					// send.addEventListener("click", function(e) {
+					// 	var t = this.value;
+					// 	console.log(t)
+					// })
+
+					if (data.type === 'sending') {
+						// console.log(data)
+						for(var i=0;i<document.querySelectorAll("#userList > p").length;i++){
+							if(document.querySelectorAll("#userList > p")[i].innerText===data.name){
+								document.querySelectorAll("#userList > p")[i].innerText=document.querySelectorAll("#userList > p")[i].innerText+"TYPING..."
+							}
+						}
+					}
+					
+				};
+			}
+		</script>
+	</body>
+</html>
